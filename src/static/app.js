@@ -20,15 +20,50 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
+        // Build participants list HTML
+        let participantsHTML = '';
+        if (details.participants.length > 0) {
+          const participantItems = details.participants
+            .map(email => `<li>${email} <span class="delete-icon" data-activity="${name}" data-email="${email}" title="Unregister">🗑️</span></li>`)
+            .join('');
+          participantsHTML = `
+            <div class="participants-section">
+              <h5>👥 Registered Participants</h5>
+              <ul class="participants-list">${participantItems}</ul>
+            </div>
+          `;
+        } else {
+          participantsHTML = `
+            <div class="participants-section">
+              <h5>👥 Registered Participants</h5>
+              <p class="no-participants">No participants yet. Be the first to join!</p>
+            </div>
+          `;
+        }
+
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          ${participantsHTML}
         `;
 
         activitiesList.appendChild(activityCard);
+      });
 
+      // Add click handlers for delete icons
+      document.querySelectorAll('.delete-icon').forEach(icon => {
+        icon.addEventListener('click', async (event) => {
+          const activity = event.target.dataset.activity;
+          const email = event.target.dataset.email;
+          await unregisterParticipant(activity, email);
+        });
+      });
+
+      // Re-populate activity dropdown
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
+      Object.keys(activities).forEach(name => {
         // Add option to select dropdown
         const option = document.createElement("option");
         option.value = name;
@@ -38,6 +73,42 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) {
       activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
       console.error("Error fetching activities:", error);
+    }
+  }
+
+  // Function to unregister a participant from an activity
+  async function unregisterParticipant(activity, email) {
+    try {
+      const response = await fetch(
+        `/activities/${encodeURIComponent(activity)}/unregister?email=${encodeURIComponent(email)}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const result = await response.json();
+
+      if (response.ok) {
+        messageDiv.textContent = result.message;
+        messageDiv.className = "success";
+        // Refresh the activities list
+        fetchActivities();
+      } else {
+        messageDiv.textContent = result.detail || "An error occurred";
+        messageDiv.className = "error";
+      }
+
+      messageDiv.classList.remove("hidden");
+
+      // Hide message after 5 seconds
+      setTimeout(() => {
+        messageDiv.classList.add("hidden");
+      }, 5000);
+    } catch (error) {
+      messageDiv.textContent = "Failed to unregister. Please try again.";
+      messageDiv.className = "error";
+      messageDiv.classList.remove("hidden");
+      console.error("Error unregistering:", error);
     }
   }
 
